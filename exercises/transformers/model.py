@@ -260,7 +260,6 @@ class Attention(nn.Module):
                 assert seq_len == 1, "Cache can only be used for single step decoding"
 
             k, v = cache_entry.update(k, v)
-            cache_start = k.shape[2]
         else:
             cache_start = 0
 
@@ -272,14 +271,13 @@ class Attention(nn.Module):
         attn = attn / (self.config.d_head**0.5)  # type: ignore
         mask = (
             torch.arange(
-                seq_len,
+                cache_start,
+                cache_start + seq_len,
                 device=attn.device,
-            )[None, :]
-            <= torch.arange(cache_start, cache_start + seq_len, device=attn.device)[
-                :, None
-            ]
+            )[:, None]
+            >= torch.arange(cache_start + seq_len, device=attn.device)[None, :]
         )
-        attn.masked_fill_(~mask, -1e9)
+        attn.masked_fill_(~mask, -torch.finfo(attn.dtype).max)
         attn = F.softmax(attn, dim=-1)
 
         combined_v = einsum(
@@ -410,7 +408,7 @@ class GPT(nn.Module):
                     )
                     logits = torch.where(
                         logits < top_k_logits[:, -1:],
-                        torch.full_like(logits, -1e9),
+                        torch.full_like(logits, -torch.finfo(logits.dtype).max),
                         logits,
                     )
 
@@ -422,10 +420,16 @@ class GPT(nn.Module):
                     )
                     cumulative_probs = torch.cumsum(sorted_probs, dim=-1)
                     sorted_indices_to_remove = cumulative_probs > top_p
-                    logits = torch.where(
-                        sorted_indices_to_remove,
-                        torch.full_like(logits, -1e9),
-                        logits,
+                    sorted_indices_to_remove[..., 1:] = sorted_indices_to_remove[
+                        ..., :-1
+                    ].clone()
+                    sorted_indices_to_remove[..., 0] = 0
+                    indices_to_remove = sorted_indices_to_remove.scatter(
+                        -1, sorted_indices, sorted_indices_to_remove
+                    )
+                    logits = logits.masked_fill(
+                        indices_to_remove,
+                        -torch.finfo(logits.dtype).max,
                     )
 
                 probs = F.softmax(logits / temperature, dim=-1)
