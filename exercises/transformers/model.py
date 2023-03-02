@@ -51,12 +51,18 @@ class TokEmbed(nn.Module):
     def __init__(self, config: GPTConfig):
         super().__init__()
         self.config = config
-        self.W_E = nn.Parameter(torch.empty(config.d_vocab, config.d_model))
+        self.W_E = nn.Parameter(
+            torch.empty(
+                config.d_vocab,
+                config.d_model,
+                device=config.device,
+            )
+        )
         self.reset_parameters()
 
     def reset_parameters(self):
         nn.init.normal_(self.W_E, std=self.config.weight_std)
-        self.W_E = self.W_E.to(self.config.device)
+        self.W_E.to(self.config.device)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return F.embedding(x, self.W_E)
@@ -71,12 +77,17 @@ class Unembed(nn.Module):
         assert (
             config.d_vocab_out is not None
         ), "d_vocab_out must be specified for unembedding"
-        self.W_U = nn.Parameter(torch.empty(config.d_vocab_out, config.d_model))
+        self.W_U = nn.Parameter(
+            torch.empty(
+                config.d_vocab_out,
+                config.d_model,
+                device=config.device,
+            )
+        )
         self.reset_parameters()
 
     def reset_parameters(self):
         nn.init.normal_(self.W_U, std=self.config.weight_std)
-        self.W_U = self.W_U.to(self.config.device)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return F.linear(x, self.W_U)
@@ -88,16 +99,25 @@ class PosEmbed(nn.Module):
     def __init__(self, config: GPTConfig):
         super().__init__()
         self.config = config
-        self.W_P = nn.Parameter(torch.empty(config.n_ctx, config.d_model))
+        self.W_P = nn.Parameter(
+            torch.empty(
+                config.n_ctx,
+                config.d_model,
+                device=config.device,
+            )
+        )
         self.reset_parameters()
 
     def reset_parameters(self):
         nn.init.normal_(self.W_P, std=self.config.weight_std)
-        self.W_P = self.W_P.to(self.config.device)
 
     def forward(self, x: torch.Tensor, cache_offset: int = 0) -> torch.Tensor:
         return F.embedding(
-            torch.arange(cache_offset, x.shape[1] + cache_offset, device=x.device),
+            torch.arange(
+                cache_offset,
+                x.shape[1] + cache_offset,
+                device=x.device,
+            ),
             self.W_P,
         )
 
@@ -111,7 +131,7 @@ class RMSNorm(nn.Module):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return x / torch.sqrt(
-            torch.mean(x ** 2, dim=-1, keepdim=True) + self.config.norm_eps
+            torch.mean(x**2, dim=-1, keepdim=True) + self.config.norm_eps
         )
 
 
@@ -127,10 +147,18 @@ class KVCacheEntry:
         assert config.d_head is not None
         return cls(
             past_k=torch.empty(
-                batch_size, config.n_heads, 0, config.d_head, device=config.device
+                batch_size,
+                config.n_heads,
+                0,
+                config.d_head,
+                device=config.device,
             ),
             past_v=torch.empty(
-                batch_size, config.n_heads, 0, config.d_head, device=config.device
+                batch_size,
+                config.n_heads,
+                0,
+                config.d_head,
+                device=config.device,
             ),
         )
 
@@ -170,23 +198,42 @@ class Attention(nn.Module):
         self.config = config
         assert config.d_head is not None
         self.W_Q = nn.Parameter(
-            torch.empty(config.n_heads, config.d_head, config.d_model)
+            torch.empty(
+                config.n_heads,
+                config.d_head,
+                config.d_model,
+                device=config.device,
+            )
         )
         self.W_K = nn.Parameter(
-            torch.empty(config.n_heads, config.d_head, config.d_model)
+            torch.empty(
+                config.n_heads,
+                config.d_head,
+                config.d_model,
+                device=config.device,
+            )
         )
         self.W_V = nn.Parameter(
-            torch.empty(config.n_heads, config.d_head, config.d_model)
+            torch.empty(
+                config.n_heads,
+                config.d_head,
+                config.d_model,
+                device=config.device,
+            )
         )
         self.W_O = nn.Parameter(
-            torch.empty(config.n_heads, config.d_model, config.d_head)
+            torch.empty(
+                config.n_heads,
+                config.d_model,
+                config.d_head,
+                device=config.device,
+            )
         )
         self.reset_parameters()
 
     def reset_parameters(self):
         for w in [self.W_Q, self.W_K, self.W_V, self.W_O]:
             nn.init.normal_(w, std=self.config.weight_std)
-            w = w.to(self.config.device)
 
     def forward(self, x: torch.Tensor, cache_entry: Optional[KVCacheEntry] = None):
         seq_len = x.shape[1]
@@ -222,10 +269,16 @@ class Attention(nn.Module):
             q,
             k,
         )
-        attn = attn / (self.config.d_head ** 0.5)  # type: ignore
-        mask = torch.arange(seq_len, device=attn.device,)[None, :] <= torch.arange(
-            cache_start, cache_start + seq_len, device=attn.device
-        )[:, None]
+        attn = attn / (self.config.d_head**0.5)  # type: ignore
+        mask = (
+            torch.arange(
+                seq_len,
+                device=attn.device,
+            )[None, :]
+            <= torch.arange(cache_start, cache_start + seq_len, device=attn.device)[
+                :, None
+            ]
+        )
         attn.masked_fill_(~mask, -1e9)
         attn = F.softmax(attn, dim=-1)
 
@@ -257,8 +310,12 @@ class MLP(nn.Module):
         super().__init__()
         self.config = config
         assert config.d_mlp is not None
-        self.W_in = nn.Parameter(torch.empty((config.d_mlp, config.d_model)))
-        self.W_out = nn.Parameter(torch.empty((config.d_model, config.d_mlp)))
+        self.W_in = nn.Parameter(
+            torch.empty(config.d_mlp, config.d_model, device=config.device)
+        )
+        self.W_out = nn.Parameter(
+            torch.empty(config.d_model, config.d_mlp, device=config.device)
+        )
         self.reset_parameters()
 
     def reset_parameters(self):
@@ -280,9 +337,9 @@ class Block(nn.Module):
         super().__init__()
         self.config = config
         self.attn = Attention(config)
-        self.norm_1 = RMSNorm(config)
+        self.norm_1 = RMSNorm(config) if config.use_norm else nn.Identity()
         self.mlp = MLP(config)
-        self.norm_2 = RMSNorm(config)
+        self.norm_2 = RMSNorm(config) if config.use_norm else nn.Identity()
 
     def forward(
         self,
@@ -303,7 +360,7 @@ class GPT(nn.Module):
         self.tok_emb = TokEmbed(config)
         self.pos_emb = PosEmbed(config)
         self.blocks = nn.ModuleList([Block(config) for _ in range(config.n_layers)])
-        self.final_norm = RMSNorm(config)
+        self.final_norm = RMSNorm(config) if config.use_norm else nn.Identity()
         self.unembed = Unembed(config)
 
     def forward(self, x: torch.Tensor, cache: Optional[KVCache] = None):
