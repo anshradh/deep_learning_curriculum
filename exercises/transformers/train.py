@@ -119,21 +119,24 @@ def train(args):
                 )
                 second_half = torch.flip(first_half, dims=[1])
                 batch = torch.cat([first_half, second_half], dim=1)
+                inputs = batch[:, :-1].clone()
+                targets = batch[:, 1:].clone()
+
+                targets[:, : args.n_ctx // 2 - 1] = -1
+
+                logits = model(inputs)
+
+                preds = torch.argmax(logits, dim=-1)
+                acc = (
+                    (
+                        preds[:, args.n_ctx // 2 - 1 :]
+                        == targets[:, args.n_ctx // 2 - 1 :]
+                    )
+                    .float()
+                    .mean()
+                )
             else:
                 raise NotImplementedError
-
-            inputs = batch[:, :-1].clone()
-            targets = batch[:, 1:].clone()
-
-            targets[:, :args.n_ctx // 2 - 1] = -1
-
-            # print(inputs)
-            # print(targets)
-
-            logits = model(inputs)
-
-            preds = torch.argmax(logits, dim=-1)
-            acc = (preds[:, args.n_ctx // 2 - 1:] == targets[:, args.n_ctx // 2 - 1:]).float().mean()
 
             logits = einops.rearrange(
                 logits,
