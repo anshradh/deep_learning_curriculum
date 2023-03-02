@@ -1,3 +1,2 @@
 venv/
-transformers/data/
-transformers/__pycache__/
+exercises/transformers/__pycache__/
