@@ -66,7 +66,6 @@ def train(args):
         for epoch in tqdm(range(1, args.epochs + 1), desc="Epoch {epoch}"):
             for i in tqdm(
                 range(0, len(local_dataset) // batch_size),
-                desc=f"Batch{i} - Epoch {epoch}",
             ):
                 optimizer.zero_grad()
 
