@@ -47,12 +47,12 @@ def train(args):
                 params=[
                     p
                     for n, p in model.named_parameters()
-                    if "W_E" not in n and "W_P" not in n
+                    if "W_E" == n or "W_P" == n
                 ]
             ),
             dict(
                 params=[
-                    p for n, p in model.named_parameters() if "W_E" in n or "W_P" in n
+                    p for n, p in model.named_parameters() if n == "W_E" or n == "W_P"
                 ],
                 weight_decay=0,
             ),
