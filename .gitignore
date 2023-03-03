@@ -1,3 +1,5 @@
 venv/
 exercises/transformers/__pycache__/
-exercises/transformers/data/shakespeare.txt
+exercises/transformers/data/shakespeare.pt
+exercises/transformers/data/__pycache__/
+*.pt
