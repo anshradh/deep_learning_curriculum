@@ -65,10 +65,10 @@ def train(args):
         weight_decay=args.weight_decay,
     )
 
-    print(optimizer)
+    # print(optimizer)
 
-    for param_group in optimizer.param_groups:
-        print(param_group)
+    # for param_group in optimizer.param_groups:
+    #     print(param_group)
 
     if rank == 0 and args.use_wandb:
         import wandb
