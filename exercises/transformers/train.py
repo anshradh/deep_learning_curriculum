@@ -61,6 +61,8 @@ def train(args):
         weight_decay=args.weight_decay,
     )
 
+    print(optimizer)
+
     if rank == 0 and args.use_wandb:
         import wandb
 
