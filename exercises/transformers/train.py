@@ -41,18 +41,22 @@ def train(args):
 
     batch_size = args.batch_size // args.device_count
 
+    print(f"Embed params: {[n for n, p in model.named_parameters() if 'W_E' in n or 'W_P' in n]}")
+
+    print(f"Non embed params: {[n for n, p in model.named_parameters() if 'W_E' not in n  and 'W_P' not in n]}")
+
     optimizer = optim.AdamW(
         [
             dict(
                 params=[
                     p
                     for n, p in model.named_parameters()
-                    if "W_E" == n or "W_P" == n
+                    if "W_E" not in n and "W_P" not in n
                 ]
             ),
             dict(
                 params=[
-                    p for n, p in model.named_parameters() if n == "W_E" or n == "W_P"
+                    p for n, p in model.named_parameters() if "W_E" in n or "W_P" in n
                 ],
                 weight_decay=0,
             ),

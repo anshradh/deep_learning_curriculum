@@ -62,7 +62,6 @@ class TokEmbed(nn.Module):
 
     def reset_parameters(self):
         nn.init.normal_(self.W_E, std=self.config.weight_std)
-        self.W_E.to(self.config.device)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return F.embedding(x, self.W_E)
