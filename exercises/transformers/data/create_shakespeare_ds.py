@@ -48,6 +48,6 @@ if __name__ == "__main__":
     )
     print(f"Saving to {os.getcwd() + '/exercises/transformers/data/shakespeare.pt'}")
     torch.save(
-        chunked_indices,
+        data,
         os.getcwd() + '/exercises/transformers/data/shakespeare.pt',
     )
