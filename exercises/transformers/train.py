@@ -47,6 +47,11 @@ def train(args):
         weight_decay=args.weight_decay,
     )
 
+    if rank == 0 and args.use_wandb:
+        import wandb
+
+        wandb.init(project="lm_training", config=args.__dict__)
+
     hooks = []
     for p in model.parameters():
         comm.Bcast(p.data, root=0)
@@ -100,13 +105,26 @@ def train(args):
 
                 optimizer.step()
 
-                if i % args.log_interval == 0 and rank == 0:
-                    print(
-                        f"Rank {rank} - Epoch {epoch} - Batch {i} - Loss {loss.item()} - Accuracy {acc.item()}"
+                if args.use_wandb and rank == 0:
+                    wandb.log(
+                        {
+                            "loss": loss.item(),
+                            "accuracy": acc.item(),
+                            "epoch": epoch,
+                            "batch": i,
+                            "examples": (i + 1) * batch_size
+                            + (epoch - 1) * len(dataset),
+                        }
                     )
 
-                if i % args.save_interval == 0 and rank == 0:
-                    torch.save(model.state_dict(), args.save_path)
+            if (epoch - 1) % args.print_interval == 0 and rank == 0:
+                print(
+                    f"Rank {rank} - Epoch {epoch} - Loss {loss.item()} - Accuracy {acc.item()}"
+                )
+
+            if (epoch - 1) % args.save_interval == 0 and rank == 0:
+                torch.save(model.state_dict(), args.save_path)
+
     else:
         for epoch in tqdm(range(1, args.epochs + 1), desc="Epoch {epoch}"):
             if args.task == "reverse_seq":
@@ -158,7 +176,17 @@ def train(args):
 
             optimizer.step()
 
-            if (epoch - 1) % args.log_interval == 0 and rank == 0:
+            if args.use_wandb and rank == 0:
+                wandb.log(
+                    {
+                        "loss": loss.item(),
+                        "accuracy": acc.item(),
+                        "epoch": epoch,
+                        "examples": epoch * batch_size,
+                    }
+                )
+
+            if (epoch - 1) % args.print_interval == 0 and rank == 0:
                 print(
                     f"Rank {rank} - Epoch {epoch} - Loss {loss.item()} - Accuracy {acc.item()}"
                 )
@@ -170,6 +198,9 @@ def train(args):
             ):
                 torch.save(model.state_dict(), args.save_path)
 
+    if args.use_wandb:
+        wandb.finish()
+
     for h in hooks:
         h.remove()
 
@@ -180,6 +211,7 @@ if __name__ == "__main__":
     parser = ArgumentParser(
         description="Train a transformer language model, using MPI for distributed training."
     )
+    parser.add_argument("--use_wandb", type=bool, default=False, help="Use wandb.")
     parser.add_argument("--d_model", type=int, required=True, help="Model dimension.")
     parser.add_argument(
         "--n_heads", type=int, required=True, help="Number of attention heads."
@@ -224,7 +256,7 @@ if __name__ == "__main__":
     )
     parser.add_argument("--device", type=str, default="cpu", help="Device to train on.")
     parser.add_argument("--seed", type=int, default=42, help="Random seed.")
-    parser.add_argument("--log_interval", type=int, default=100, help="Log interval.")
+    parser.add_argument("--print_interval", type=int, default=100, help="Print interval.")
     parser.add_argument(
         "--save_interval", type=int, default=1000, help="Save interval."
     )
