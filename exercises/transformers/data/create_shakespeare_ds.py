@@ -2,6 +2,7 @@
 import torch
 import re
 import requests
+import os
 
 response = requests.get("https://www.gutenberg.org/files/100/100-0.txt")
 response.encoding = "utf-8-sig"
@@ -47,5 +48,5 @@ if __name__ == "__main__":
     )
     torch.save(
         chunked_indices,
-        "~/deep_learning_curriculum/exercises/transformers/data/shakespeare.pt",
+        os.getcwd() + "shakespeare.pt",
     )
