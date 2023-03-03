@@ -19,15 +19,18 @@ for word in split_content:
         idx2word[idx] = word
         idx += 1
 
+
 def tokenize(text: str):
     split = re.split(r"\b", text)
     return [word2idx[token] for token in split]
+
 
 def detokenize(indices: torch.Tensor):
     if indices.ndim == 1:
         return "".join([idx2word[idx.item()] for idx in indices])
     elif indices.ndim == 2:
         return ["".join([idx2word[idx.item()] for idx in row]) for row in indices]
+
 
 if __name__ == "__main__":
     indices = []
@@ -38,4 +41,11 @@ if __name__ == "__main__":
     chunked_indices = [chunk for chunk in chunked_indices if len(chunk) == 970]
     chunked_indices = torch.stack(chunked_indices)
     chunked_indices = chunked_indices[:-1]
-    torch.save(chunked_indices, "/Users/anshumanradhakrishnan/repos/deep_learning_curriculum/exercises/transformers/data/shakespeare.pt")
+    data = dict(
+        train=chunked_indices[: chunked_indices.shape[0] // 2],
+        val=chunked_indices[chunked_indices.shape[0] // 2 :],
+    )
+    torch.save(
+        chunked_indices,
+        "/Users/anshumanradhakrishnan/repos/deep_learning_curriculum/exercises/transformers/data/shakespeare.pt",
+    )

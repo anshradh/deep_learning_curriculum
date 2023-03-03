@@ -62,7 +62,8 @@ def train(args):
     comm.Barrier()
 
     if args.data is not None:
-        dataset = torch.load(args.data)
+        data = torch.load(args.data)
+        dataset = data["train"]
 
         local_dataset = dataset[
             rank * len(dataset) // size : (rank + 1) * len(dataset) // size
@@ -256,7 +257,9 @@ if __name__ == "__main__":
     )
     parser.add_argument("--device", type=str, default="cpu", help="Device to train on.")
     parser.add_argument("--seed", type=int, default=42, help="Random seed.")
-    parser.add_argument("--print_interval", type=int, default=100, help="Print interval.")
+    parser.add_argument(
+        "--print_interval", type=int, default=100, help="Print interval."
+    )
     parser.add_argument(
         "--save_interval", type=int, default=1000, help="Save interval."
     )
