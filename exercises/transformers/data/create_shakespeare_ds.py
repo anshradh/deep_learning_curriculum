@@ -47,5 +47,5 @@ if __name__ == "__main__":
     )
     torch.save(
         chunked_indices,
-        "/Users/anshumanradhakrishnan/repos/deep_learning_curriculum/exercises/transformers/data/shakespeare.pt",
+        "~/deep_learning_curriculum/exercises/transformers/data/shakespeare.pt",
     )
