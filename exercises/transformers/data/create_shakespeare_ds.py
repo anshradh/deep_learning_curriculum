@@ -46,7 +46,8 @@ if __name__ == "__main__":
         train=chunked_indices[: chunked_indices.shape[0] // 2],
         val=chunked_indices[chunked_indices.shape[0] // 2 :],
     )
+    print(f"Saving to {os.getcwd() + '/exercises/transformers/data/shakespeare.pt'}")
     torch.save(
         chunked_indices,
-        os.getcwd() + "shakespeare.pt",
+        os.getcwd() + '/exercises/transformers/data/shakespeare.pt',
     )
