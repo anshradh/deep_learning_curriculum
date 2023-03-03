@@ -49,5 +49,5 @@ if __name__ == "__main__":
     print(f"Saving to {os.getcwd() + '/exercises/transformers/data/shakespeare.pt'}")
     torch.save(
         data,
-        os.getcwd() + '/exercises/transformers/data/shakespeare.pt',
+        os.getcwd() + "/exercises/transformers/data/shakespeare.pt",
     )

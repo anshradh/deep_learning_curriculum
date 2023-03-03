@@ -42,7 +42,21 @@ def train(args):
     batch_size = args.batch_size // args.device_count
 
     optimizer = optim.AdamW(
-        model.parameters(),
+        [
+            dict(
+                params=[
+                    p
+                    for n, p in model.named_parameters()
+                    if "W_E" not in n and "W_P" not in n
+                ]
+            ),
+            dict(
+                params=[
+                    p for n, p in model.named_parameters() if "W_E" in n or "W_P" in n
+                ],
+                weight_decay=0,
+            ),
+        ],
         lr=args.learning_rate,
         weight_decay=args.weight_decay,
     )
