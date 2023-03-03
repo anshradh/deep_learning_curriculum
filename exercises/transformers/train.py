@@ -41,10 +41,6 @@ def train(args):
 
     batch_size = args.batch_size // args.device_count
 
-    print(f"Embed params: {[n for n, p in model.named_parameters() if 'W_E' in n or 'W_P' in n]}")
-
-    print(f"Non embed params: {[n for n, p in model.named_parameters() if 'W_E' not in n  and 'W_P' not in n]}")
-
     optimizer = optim.AdamW(
         [
             dict(
@@ -64,11 +60,6 @@ def train(args):
         lr=args.learning_rate,
         weight_decay=args.weight_decay,
     )
-
-    # print(optimizer)
-
-    # for param_group in optimizer.param_groups:
-    #     print(param_group)
 
     if rank == 0 and args.use_wandb:
         import wandb
