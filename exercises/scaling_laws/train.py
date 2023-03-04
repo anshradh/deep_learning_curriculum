@@ -91,7 +91,7 @@ def train(args):
     if args.use_wandb:
         import wandb
 
-        wandb.init(project="scaling_laws", config=args)
+        wandb.init(project=args.wandb_project, config=args)
 
     for epoch in tqdm(range(1, args.epochs + 1)):
         for batch_idx, (data, target) in enumerate(train_loader):
