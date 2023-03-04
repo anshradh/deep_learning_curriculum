@@ -18,6 +18,8 @@ def train(args):
     rank = comm.Get_rank()
     size = comm.Get_size()
 
+    torch.manual_seed(args.seed + rank)
+
     device = torch.device(args.device, rank)
 
     config = MNISTCNNConfig(
@@ -42,6 +44,11 @@ def train(args):
         transform=torchvision.transforms.ToTensor(),
     )
 
+    train_dataset = Subset(
+        train_dataset,
+        torch.randperm(int(len(train_dataset) * args.dataset_fraction)).tolist(),
+    )
+
     val_dataset = torchvision.datasets.MNIST(
         root="data",
         train=False,
@@ -52,7 +59,8 @@ def train(args):
     local_train_dataset = Subset(
         train_dataset,
         range(
-            rank * len(train_dataset) // size, (rank + 1) * len(train_dataset) // size
+            rank * len(train_dataset) // size,
+            (rank + 1) * len(train_dataset) // size,
         ),
     )
 
@@ -118,12 +126,12 @@ def train(args):
                     }
                 )
 
-            if batch_idx % args.print_interval == 0:
+            if args.print_interval is not None and batch_idx % args.print_interval == 0:
                 print(
                     f"Train Epoch: {epoch} \tLoss: {loss.item():.6f}\tAccuracy: {accuracy.item():.6f}"
                 )
 
-            if batch_idx % args.save_interval == 0 and rank == 0:
+            if args.save_interval is not None and batch_idx % args.save_interval == 0 and rank == 0:
                 torch.save(
                     model.state_dict(),
                     f"{args.save_path}mnist_model_{epoch}_{batch_idx}.pt",
@@ -155,7 +163,10 @@ def train(args):
     for hook in hooks:
         hook.remove()
 
-    torch.save(model.state_dict(), f"{args.save_path}mnist_model_final.pt")
+    if rank == 0:
+      torch.save(
+          model.state_dict(), f"{args.save_path}mnist_model_final_n_filters_{config.n_filters}_dataset_frac_{args.dataset_frac:3f}_seed_{args.seed}.pt"
+      )
 
     if args.use_wandb and rank == 0:
         wandb.finish()
@@ -168,16 +179,17 @@ if __name__ == "__main__":
     arg_parser.add_argument("--seed", type=int, default=0)
     arg_parser.add_argument("--batch_size", type=int, default=64)
     arg_parser.add_argument("--learning_rate", type=float, default=1e-3)
+    arg_parser.add_argument("--dataset_fraction", type=float, default=1.0)
     arg_parser.add_argument("--epochs", type=int, default=10)
     arg_parser.add_argument("--d_kernel", type=int, default=3)
     arg_parser.add_argument("--n_filters", type=int, default=32)
-    arg_parser.add_argument("--n_layers", type=int, default=3)
+    arg_parser.add_argument("--n_layers", type=int, default=5)
     arg_parser.add_argument("--dropout", type=float, default=0.25)
     arg_parser.add_argument("--weight_decay", type=float, default=0.02)
     arg_parser.add_argument("--use_wandb", type=bool, default=False)
     arg_parser.add_argument("--wandb_project", type=str, default="scaling_laws")
-    arg_parser.add_argument("--print_interval", type=int, default=1)
-    arg_parser.add_argument("--save_interval", type=int, default=5)
+    arg_parser.add_argument("--print_interval", type=int, default=None)
+    arg_parser.add_argument("--save_interval", type=int, default=None)
     arg_parser.add_argument("--save_path", type=str, default="")
 
     args = arg_parser.parse_args()
