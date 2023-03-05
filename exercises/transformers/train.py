@@ -68,8 +68,9 @@ def train(args):
 
     hooks = []
     for p in model.parameters():
-        torch.cuda.synchronize(device)
-        comm.Bcast(p.data, root=0)
+        torch.cuda.current_stream(device).synchronize()
+        print(f"Broadcasting {p.shape}...")
+        comm.Bcast(p, root=0)
         hooks.append(
             p.register_hook(lambda grad: grad / size if grad is not None else grad)
         )
