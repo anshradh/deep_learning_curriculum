@@ -1,21 +1,19 @@
 from argparse import ArgumentParser, Namespace
-from dataclasses import dataclass
 
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 from model import GPT, GPTConfig
-from mpi4py import MPI
-from torch.utils.data import DataLoader, Dataset
 from tqdm import tqdm
 import einops
+import torch.distributed as dist
+import os
+import torch.multiprocessing as mp
 
 
-def train(args):
-    comm = MPI.COMM_WORLD
-    rank = comm.Get_rank()
-    size = comm.Get_size()
+def train(args: Namespace):
+    rank = dist.get_rank() if dist.is_initialized() else 0
+    size = dist.get_world_size() if dist.is_initialized() else 1
 
     torch.manual_seed(args.seed + rank)
 
@@ -47,16 +45,13 @@ def train(args):
         wandb.init(project="lm_training", config=args.__dict__)
 
     hooks = []
-    for p in model.parameters():
-        if rank != 0:
-            p.data = torch.empty(p.shape, device=device)
-        torch.cuda.current_stream(device).synchronize()
-        print(f"Broadcasting {p.shape}...")
-        comm.Bcast(p.data, root=0)
-        comm.Barrier()
-        hooks.append(
-            p.register_hook(lambda grad: grad / size if grad is not None else grad)
-        )
+
+    if dist.is_initialized():
+        for p in model.parameters():
+            dist.broadcast(p.data, 0)
+            hooks.append(
+                p.register_hook(lambda grad: grad / size if grad is not None else grad)
+            )
 
     optimizer = optim.AdamW(
         [
@@ -115,12 +110,10 @@ def train(args):
 
                 loss.backward()
 
-                for p in model.parameters():
-                    if p.grad is not None:
-                        torch.cuda.synchronize(device)
-                        comm.Allreduce(MPI.IN_PLACE, p.grad.data, op=MPI.SUM)
-
-                comm.Barrier()
+                if dist.is_initialized():
+                    for p in model.parameters():
+                        if p.grad is not None:
+                            dist.all_reduce(p.grad.data, op=dist.ReduceOp.SUM)
 
                 optimizer.step()
 
@@ -187,12 +180,10 @@ def train(args):
 
             loss.backward()
 
-            for p in model.parameters():
-                if p.grad is not None:
-                    torch.cuda.synchronize(device)
-                    comm.Allreduce(MPI.IN_PLACE, p.grad.data, op=MPI.SUM)
-
-            comm.Barrier()
+            if dist.is_initialized():
+                for p in model.parameters():
+                    if p.grad is not None:
+                        dist.all_reduce(p.grad.data, op=dist.ReduceOp.SUM)
 
             optimizer.step()
 
@@ -225,6 +216,13 @@ def train(args):
         h.remove()
 
     torch.save(model.state_dict(), args.save_path)
+
+
+def rank_process(rank, world_size, args):
+    os.environ["CUDA_VISIBLE_DEVICES"] = str(rank)
+    store = dist.TCPStore("127.0.0.1", 29500, world_size, rank == 0)
+    dist.init_process_group("nccl", store=store, rank=rank, world_size=world_size,)
+    train(args)
 
 
 if __name__ == "__main__":
@@ -301,4 +299,12 @@ if __name__ == "__main__":
         "gelu",
     ], "Activation function must be either relu or gelu."
 
-    train(args)
+    if args.device_count > 1:
+        mp.spawn(
+            rank_process,
+            args=(args.device_count, args),
+            nprocs=args.device_count,
+            join=True,
+        )
+    else:
+        train(args)

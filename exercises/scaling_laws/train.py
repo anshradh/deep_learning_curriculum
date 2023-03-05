@@ -1,23 +1,20 @@
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
-import einops
-from fancy_einsum import einsum
-from dataclasses import dataclass
 import torch.optim as optim
-from mpi4py import MPI
 from tqdm import tqdm
 import torchvision
-from torch.utils.data import DataLoader, Dataset, Subset
+from torch.utils.data import DataLoader, Subset
 from model import MNISTCNN, MNISTCNNConfig
 from argparse import ArgumentParser, Namespace
 import math
+import torch.distributed as dist
+import os
+import torch.multiprocessing as mp
 
 
-def train(args):
-    comm = MPI.COMM_WORLD
-    rank = comm.Get_rank()
-    size = comm.Get_size()
+def train(args: Namespace):
+    rank = dist.get_rank() if dist.is_initialized() else 0
+    size = dist.get_world_size() if dist.is_initialized() else 1
 
     device = torch.device(args.device, rank)
 
@@ -98,14 +95,12 @@ def train(args):
         model.train()
 
         hooks = []
-        for p in model.parameters():
-            torch.cuda.synchronize(device)
-            comm.Bcast(p.data, root=0)
-            hooks.append(
-                p.register_hook(lambda grad: grad / size if grad is not None else grad)
-            )
-
-        comm.Barrier()
+        if dist.is_initialized():
+            for p in model.parameters():
+                dist.broadcast(p.data, 0)
+                hooks.append(
+                    p.register_hook(lambda grad: grad / size if grad is not None else grad)
+                )
 
         if args.use_wandb:
             import wandb
@@ -121,12 +116,11 @@ def train(args):
                 accuracy = (output.argmax(dim=1) == target).float().mean()
                 loss.backward()
 
-                for p in model.parameters():
-                    if p.grad is not None:
-                        torch.cuda.synchronize(device)
-                        comm.Allreduce(MPI.IN_PLACE, p.grad.data, op=MPI.SUM)
+                if dist.is_initialized():
+                    for p in model.parameters():
+                        if p.grad is not None:
+                            dist.all_reduce(p.grad.data, op=dist.ReduceOp.SUM)
 
-                comm.Barrier()
 
                 optimizer.step()
 
@@ -158,22 +152,24 @@ def train(args):
 
             with torch.no_grad():
                 model.eval()
-                val_loss = 0
-                val_accuracy = 0
+                val_loss = 0.
+                val_accuracy = 0.
                 for data, target in val_loader:
                     data, target = data.to(device), target.to(device)
                     output = model(data)
-                    val_loss += F.cross_entropy(output, target, reduction="sum").item()
+                    val_loss += F.cross_entropy(output, target, reduction="sum")
                     val_accuracy += (
-                        (output.argmax(dim=1) == target).float().sum().item()
+                        (output.argmax(dim=1) == target).float().sum()
                     )
                 val_loss /= len(local_val_dataset)
                 val_accuracy /= len(local_val_dataset)
 
-                val_loss = comm.allreduce(val_loss, op=MPI.SUM) / size
-                val_accuracy = comm.allreduce(val_accuracy, op=MPI.SUM) / size
+                val_loss = dist.all_reduce(val_loss / size, op=dist.ReduceOp.SUM)
+                val_accuracy = dist.all_reduce(val_accuracy / size, op=dist.ReduceOp.SUM)
 
-                comm.Barrier()
+                val_loss = val_loss.item()
+                val_accuracy = val_accuracy.item()
+
 
                 if rank == 0:
                     print(
@@ -216,6 +212,11 @@ def train(args):
             f"{args.results_save_path}mnist_model_final_n_filters_{config.n_filters}_dataset_frac_{args.dataset_fraction:3f}_results.pt",
         )
 
+def rank_process(rank, world_size, args):
+    os.environ["CUDA_VISIBLE_DEVICES"] = str(rank)
+    store = dist.TCPStore("127.0.0.1", 29500, world_size, rank == 0)
+    dist.init_process_group("nccl", store=store, rank=rank, world_size=world_size,)
+    train(args)
 
 if __name__ == "__main__":
     arg_parser = ArgumentParser()
@@ -249,4 +250,12 @@ if __name__ == "__main__":
             args.device_count <= torch.cuda.device_count()
         ), "Not enough GPUs available."
 
-    train(args)
+    if args.device_count > 1:
+        mp.spawn(
+            rank_process,
+            args=(args.device_count, args),
+            nprocs=args.device_count,
+            join=True,
+        )
+    else:
+        train(args)
