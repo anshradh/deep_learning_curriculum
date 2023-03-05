@@ -1,7 +1,8 @@
 venv/**
 exercises/transformers/data/shakespeare.pt
-*.pt
 wandb/**
 *__pycache__/
 data/**
 scaling_laws_models/**
+*.pt
+!exercises/scaling_laws/results/*.pt
