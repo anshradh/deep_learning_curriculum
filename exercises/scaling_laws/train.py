@@ -99,6 +99,7 @@ def train(args):
 
         hooks = []
         for p in model.parameters():
+            torch.cuda.synchronize(device)
             comm.Bcast(p.data, root=0)
             hooks.append(
                 p.register_hook(lambda grad: grad / size if grad is not None else grad)
@@ -122,7 +123,8 @@ def train(args):
 
                 for p in model.parameters():
                     if p.grad is not None:
-                        comm.Allreduce(MPI.IN_PLACE, p.grad, op=MPI.SUM)
+                        torch.cuda.synchronize(device)
+                        comm.Allreduce(MPI.IN_PLACE, p.grad.data, op=MPI.SUM)
 
                 comm.Barrier()
 
