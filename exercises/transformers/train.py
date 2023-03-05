@@ -41,6 +41,21 @@ def train(args):
 
     batch_size = args.batch_size // args.device_count
 
+    if rank == 0 and args.use_wandb:
+        import wandb
+
+        wandb.init(project="lm_training", config=args.__dict__)
+
+    hooks = []
+    for p in model.parameters():
+        torch.cuda.current_stream(device).synchronize()
+        print(f"Broadcasting {p.shape}...")
+        comm.Bcast(p.data, root=0)
+        comm.Barrier()
+        hooks.append(
+            p.register_hook(lambda grad: grad / size if grad is not None else grad)
+        )
+
     optimizer = optim.AdamW(
         [
             dict(
@@ -60,21 +75,6 @@ def train(args):
         lr=args.learning_rate,
         weight_decay=args.weight_decay,
     )
-
-    if rank == 0 and args.use_wandb:
-        import wandb
-
-        wandb.init(project="lm_training", config=args.__dict__)
-
-    hooks = []
-    for p in model.parameters():
-        torch.cuda.current_stream(device).synchronize()
-        print(f"Broadcasting {p.shape}...")
-        comm.Bcast(p.data, root=0)
-        comm.Barrier()
-        hooks.append(
-            p.register_hook(lambda grad: grad / size if grad is not None else grad)
-        )
 
     if args.data is not None:
         data = torch.load(args.data)
