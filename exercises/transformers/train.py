@@ -68,7 +68,7 @@ def train(args):
 
     hooks = []
     for p in model.parameters():
-        torch.cuda.current_stream(device).synchronize()
+        # torch.cuda.current_stream(device).synchronize()
         print(f"Broadcasting {p.shape}...")
         comm.Bcast(p.data, root=0)
         comm.Barrier()
