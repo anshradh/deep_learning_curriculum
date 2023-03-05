@@ -48,6 +48,8 @@ def train(args):
 
     hooks = []
     for p in model.parameters():
+        if rank != 0:
+            p.data = torch.empty(p.shape, device=device)
         torch.cuda.current_stream(device).synchronize()
         print(f"Broadcasting {p.shape}...")
         comm.Bcast(p.data, root=0)
