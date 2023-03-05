@@ -186,7 +186,7 @@ def train(args):
                         }
                     )
                 if epoch == args.epochs and rank == 0:
-                    final_val_losses.append(val_loss.item())
+                    final_val_losses.append(val_loss)
 
         for hook in hooks:
             hook.remove()
