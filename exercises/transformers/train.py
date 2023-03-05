@@ -71,11 +71,10 @@ def train(args):
         torch.cuda.current_stream(device).synchronize()
         print(f"Broadcasting {p.shape}...")
         comm.Bcast(p.data, root=0)
+        comm.Barrier()
         hooks.append(
             p.register_hook(lambda grad: grad / size if grad is not None else grad)
         )
-
-    comm.Barrier()
 
     if args.data is not None:
         data = torch.load(args.data)
