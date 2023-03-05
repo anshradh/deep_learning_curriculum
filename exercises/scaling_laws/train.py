@@ -194,7 +194,7 @@ def train(args):
         if rank == 0:
             torch.save(
                 model.state_dict(),
-                f"{args.model_save_path}mnist_model_final_n_filters_{config.n_filters}_dataset_frac_{args.dataset_fraction:3f}_seed_{args.seed}.pt",
+                f"{args.model_save_path}mnist_model_final_n_filters_{config.n_filters}_dataset_frac_{args.dataset_fraction:3f}_seed_{s}.pt",
             )
 
         if args.use_wandb and rank == 0:
