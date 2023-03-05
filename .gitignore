@@ -5,4 +5,4 @@ wandb/**
 data/**
 scaling_laws_models/**
 *.pt
-!exercises/scaling_laws/*.pt
+!exercises/scaling_laws/results/*.pt
