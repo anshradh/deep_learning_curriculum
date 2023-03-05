@@ -6,9 +6,11 @@ import torch
 from math import ceil, floor, log
 import plotly.express as px
 
+
 # %%
 def closest_power_of_2(x):
     return 1 if x == 0 else 2 ** round(log(x, 2))
+
 
 # %%
 full_results_dict = dict(
@@ -28,7 +30,7 @@ for p in range(0, 5):
             full_results_dict["loss"].append(results["loss"])
             full_results_dict["n_filters"].append(results["n_filters"])
             full_results_dict["dataset_fraction"].append(results["dataset_fraction"])
-            full_results_dict["compute"].append(closest_power_of_2(n*n*(2**-p)))
+            full_results_dict["compute"].append(closest_power_of_2(n * n * (2**-p)))
         except:
             print(f"Failed to load n_filters={n}, dataset_fraction={(2**-p):3f}")
             continue

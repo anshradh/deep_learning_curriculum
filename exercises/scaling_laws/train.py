@@ -99,7 +99,9 @@ def train(args: Namespace):
             for p in model.parameters():
                 dist.broadcast(p.data, 0)
                 hooks.append(
-                    p.register_hook(lambda grad: grad / size if grad is not None else grad)
+                    p.register_hook(
+                        lambda grad: grad / size if grad is not None else grad
+                    )
                 )
 
         if args.use_wandb:
@@ -120,7 +122,6 @@ def train(args: Namespace):
                     for p in model.parameters():
                         if p.grad is not None:
                             dist.all_reduce(p.grad.data, op=dist.ReduceOp.SUM)
-
 
                 optimizer.step()
 
@@ -152,24 +153,23 @@ def train(args: Namespace):
 
             with torch.no_grad():
                 model.eval()
-                val_loss = 0.
-                val_accuracy = 0.
+                val_loss = 0.0
+                val_accuracy = 0.0
                 for data, target in val_loader:
                     data, target = data.to(device), target.to(device)
                     output = model(data)
                     val_loss += F.cross_entropy(output, target, reduction="sum")
-                    val_accuracy += (
-                        (output.argmax(dim=1) == target).float().sum()
-                    )
+                    val_accuracy += (output.argmax(dim=1) == target).float().sum()
                 val_loss /= len(local_val_dataset)
                 val_accuracy /= len(local_val_dataset)
 
                 val_loss = dist.all_reduce(val_loss / size, op=dist.ReduceOp.SUM)
-                val_accuracy = dist.all_reduce(val_accuracy / size, op=dist.ReduceOp.SUM)
+                val_accuracy = dist.all_reduce(
+                    val_accuracy / size, op=dist.ReduceOp.SUM
+                )
 
                 val_loss = val_loss.item()
                 val_accuracy = val_accuracy.item()
-
 
                 if rank == 0:
                     print(
@@ -212,11 +212,18 @@ def train(args: Namespace):
             f"{args.results_save_path}mnist_model_final_n_filters_{config.n_filters}_dataset_frac_{args.dataset_fraction:3f}_results.pt",
         )
 
+
 def rank_process(rank, world_size, args):
     os.environ["CUDA_VISIBLE_DEVICES"] = str(rank)
     store = dist.TCPStore("127.0.0.1", 29500, world_size, rank == 0)
-    dist.init_process_group("nccl", store=store, rank=rank, world_size=world_size,)
+    dist.init_process_group(
+        "nccl",
+        store=store,
+        rank=rank,
+        world_size=world_size,
+    )
     train(args)
+
 
 if __name__ == "__main__":
     arg_parser = ArgumentParser()

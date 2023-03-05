@@ -221,7 +221,12 @@ def train(args: Namespace):
 def rank_process(rank, world_size, args):
     os.environ["CUDA_VISIBLE_DEVICES"] = str(rank)
     store = dist.TCPStore("127.0.0.1", 29500, world_size, rank == 0)
-    dist.init_process_group("nccl", store=store, rank=rank, world_size=world_size,)
+    dist.init_process_group(
+        "nccl",
+        store=store,
+        rank=rank,
+        world_size=world_size,
+    )
     train(args)
 
 
