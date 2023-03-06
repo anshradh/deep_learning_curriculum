@@ -117,6 +117,10 @@ def train(args: Namespace):
 
                 optimizer.step()
 
+                if dist.is_initialized():
+                    dist.all_reduce(loss / size, op=dist.ReduceOp.SUM)
+                    dist.all_reduce(acc / size, op=dist.ReduceOp.SUM)
+
                 if args.use_wandb and rank == 0:
                     wandb.log(
                         {
