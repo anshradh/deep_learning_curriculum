@@ -209,13 +209,13 @@ def train(args: Namespace):
             ):
                 torch.save(model.state_dict(), args.save_path)
 
-    if args.use_wandb:
+    if args.use_wandb and rank == 0:
         wandb.finish()
 
     for h in hooks:
         h.remove()
 
-    if args.save_path is not None:
+    if args.save_path is not None and rank == 0:
         torch.save(model.state_dict(), args.save_path)
 
 
