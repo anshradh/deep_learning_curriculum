@@ -134,7 +134,7 @@ def train(args: Namespace):
                     f"Rank {rank} - Epoch {epoch} - Loss {loss.item()} - Accuracy {acc.item()}"
                 )
 
-            if (epoch - 1) % args.save_interval == 0 and rank == 0:
+            if (epoch - 1) % args.save_interval == 0 and rank == 0 and args.save_path is not None:
                 torch.save(model.state_dict(), args.save_path)
 
     else:
@@ -215,7 +215,8 @@ def train(args: Namespace):
     for h in hooks:
         h.remove()
 
-    torch.save(model.state_dict(), args.save_path)
+    if args.save_path is not None:
+        torch.save(model.state_dict(), args.save_path)
 
 
 def rank_process(rank, world_size, args):
@@ -271,8 +272,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--act_fn", type=str, default="gelu", help="Activation function."
     )
-    parser.add_argument(
-        "--weight_std",
+    parser.add_argument(        "--weight_std",
         type=float,
         default=0.02,
         help="Weight initialization standard deviation.",
