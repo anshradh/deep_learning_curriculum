@@ -128,8 +128,8 @@ def train(args: Namespace):
                             "accuracy": acc.item(),
                             "epoch": epoch,
                             "batch": i,
-                            "examples": (i + 1) * batch_size
-                            + (epoch - 1) * len(dataset) * size,
+                            "examples": (i + 1) * batch_size * size
+                            + (epoch - 1) * len(dataset),
                         }
                     )
 
