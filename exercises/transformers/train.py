@@ -129,7 +129,7 @@ def train(args: Namespace):
                             "epoch": epoch,
                             "batch": i,
                             "examples": (i + 1) * batch_size
-                            + (epoch - 1) * len(dataset),
+                            + (epoch - 1) * len(dataset) * size,
                         }
                     )
 
